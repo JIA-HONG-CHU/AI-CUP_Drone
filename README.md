@@ -1,145 +1,80 @@
-# Scene_text_detection_and_recognition
-[![PWC](./image/t-brain_icon.png)](https://tbrain.trendmicro.com.tw/Competitions/Details/19)
+# AI_CUP 無人機飛行載具之智慧計數競賽
 
-T-Brain：繁體中文場景文字辨識競賽－高階賽：複雜街景之文字定位與辨識
-## Rank 3 on Public and Private
-![Public](./image/Public.png)
-![Private](./image/Private.png)
+## Rank 19 (Total 236 teams)
+
+We train with [Yolov7](https://github.com/WongKinYiu/yolov7) and [YoloR](https://github.com/WongKinYiu/yolor)  models and augment our data with three additional datasets.
+
+## Augment Datasets
+1. [Visdrone](https://github.com/VisDrone/VisDrone-Dataset)
+2. [CAPRK](https://winstonhsu.info/drone-view-object-counting-dataset-carpk/)
+3. [AI-TOD](https://onedrive.live.com/?authkey=%21AIaFB7a2xTVS3mI&id=7B626C080988548E%218816&cid=7B626C080988548E)
+
+Convert these data into Yolo format and change the labels to only four categories: cars, trucks, pedestrians, and motorcycles.
+
+## Datasets Perprocessing
+Create three folders (train\Val\Test) under the datasets folder
+1. train folder (Training dataset)
+2. val folder   (Validation dataset)
+3. test folder  (AI-CUP public and private datasets)
+
+Once you have prepared three folders, then you should put the photos and labels from the three datasets mentioned above into the corresponding folders (e.g. Training photos should go in the train/images folder, and training labels should go in the train/labels folder), and then run create_txt.ipynb to create three txt files.
 
 # requirements
 ```
-pip install -r requirements.txt
+pip install -r yolov7/requirements.txt
 ```
 
-## Stage One: Detection 
-#### (Remember to modify the path of file to yours. e.g. cd yolov5)
-We use [yolov5](https://github.com/ultralytics/yolov5) to capture the text of the scene.
+## YOlOV7 ([Current Woring Directory] AI-CUP_Drone/yolov7）
+#### (Remember to create a aicup.yaml file under the yolov7/data folder)
 
-YoloV5 extracts two types of objects from the scene, the first type is Chinese character and the second type is English\Numeric string or character.
-
-### preporcessing
-
-Please see README.md in the yolov5/preprocessing directory
-
-### Train 
+### Training
 ```
-python train.py --img 1365 --rect --batch 8 --epochs 300 --data data/high_level.yaml --weights yolov5x6.pt --device 0
+python train_aux.py --workers 8 --device 0 --batch-size 8 --data data/aicup.yaml --img 1280 1280 --cfg cfg/training/yolov7-e6e.yaml --weights 'yolov7-e6e_training.pt' --name yolov7-e6e --hyp data/hyp.scratch.p6.yaml --epochs 500  --cache-images
+```
+
+### Testing [Weights](https://drive.google.com/drive/folders/1JD1a3ML_A7ufjIy4TQMngMb8Zvt-ndRc?usp=sharing)
+```
+python detect.py --weights "runs/train/yolov7-e6e/weights/yolov7_best.pt" --source "../datasets/test/images/" --conf-thres 0.3 --img-size 1920 --augment --save-txt --save-conf 
 ```
 
 
-### Inference
+## YOlOR ([Current Woring Directory] AI-CUP_Drone/yolor)
+#### (Remember to create a aicup.yaml file under the yolor/data folder)
 
-Donwload our Training weights to test on private datasets (https://drive.google.com/drive/folders/1NkuSVJcCduJ1YiDAhk2xj4yzkRxn0CWs?usp=sharing)
+### Training
 ```
-python detect.py --source datasets/high_level/images/private/ --weights runs/train/exp4/weights/best.pt --img 1408 --save-txt --save-conf  --conf-thres 0.7 --iou-thres 0.45 --augment
-```
-
-## Stage Two: Recognition 
-#### (Remember to modify the path of file to yours. e.g. cd deep-text-recognition-benchmark)
-We use [deep-text-recognitiom-benchmark](https://github.com/clovaai/deep-text-recognition-benchmark) to recognize the text of the detected image.
-
-There are two models for this step, the first model is for Chinese character and the second is for English\Numeric string or character.
-
-For the first model, we train on the training dataset of T-brain and ReCTS.
-
-For the second model, we use the pretrained of deep-text-recognitiom-benchmark.
-
-### Prepare the dataset 
-We first crop the chinese character from T-brain images. 
-```
-python processing/crop_chinese_ch.py 
-```
-Then crop the chars from ReCTS training set.
-```
-python processing/crop_AE_ch.py
-```
-And we split the first 5000 words as validation set, the rest of wors are training set.
-
-Here are the characters we already cropped: (https://drive.google.com/file/d/1flVnxIIRgn2akANQ1Jhix-AbFHrQpYaA/view?usp=sharing). 
-Download it and put it on the root of deep-text-recognition-benchmark.
-
-Then we create language model datasets, The output will default save at [./result] folder.
-```
-python create_lmdb_dataset.py --inputPath data_tbrain_and_AE/train --gtFile data_tbrain_and_AE/train/gt.txt --outputPath result/data_tbrain_and_AE/train
-python create_lmdb_dataset.py --inputPath data_tbrain_and_AE/val --gtFile data_tbrain_and_AE/val/gt.txt --outputPath result/data_tbrain_and_AE/val
+python train.py --batch-size 4 --img 1280 1280 --data data/aicup.yaml --cfg models/yolor-d6.yaml --weights 'yolor-d6-paper-573.pt' --device 0 --name yolor_d6 --hyp data/hyp.scratch.1280.yaml --epochs 500 --cache-image
 ```
 
-### Train
+### Testing [Weights](https://drive.google.com/drive/folders/1JD1a3ML_A7ufjIy4TQMngMb8Zvt-ndRc?usp=sharing)
 ```
-python train.py --train_data result/data_tbrain_and_AE/train/ --valid_data result/data_tbrain_and_AE/val/ --Transformation TPS --FeatureExtraction ResNet --SequenceModeling BiLSTM --Prediction Attn --sensitive
-```
-
-### Inference
-if there exist old pred0 and pred1 folder, please run this cmd
-```
-rm -r pred0 && rm -r pred1
+python detect.py --weights "runs/train/yolor_d62/weights/yolor_best.pt" --source "../datasets/test/images/" --conf-thres 0.45 --img-size 1920 --augment --save-txt --save-conf --device 0
 ```
 
-Every time you recognize the characters from crop images, please follow below:
 
-1. Create folders for cropping images 
-```
-mkdir pred0 && mkdir pred1
-```
-2. Download the weight on (https://drive.google.com/file/d/1PIh6JoZ5rlc0_2itRVRgWjFeQUxp2wTr/view?usp=sharing), unzip it and put it on the root of deep-text-recognition-benchmark.
-3. modify --out_csv_name and --label_root to where you want to save and where the .txt files you save which detect by yolo, and download the private of public image of T-brain into ./images and run below cmd.
-```
-python recognize.py --Transformation TPS --FeatureExtraction ResNet --SequenceModeling BiLSTM --Prediction Attn --sensitive --out_csv_name recog_output/out.csv --label_root ../yolov5/runs/detect/exp/ --img_path images/private/ --saved_model saved_models/TPS-ResNet-BiLSTM-Attn-Seed1111_1130/best_accuracy.pth 
-```
-Now you can see the results at the path you set.
+## Post-processing (WBF)
 
-
-## Post processing
-For the T-brain competition, we need to follow the below steps:
-
-1. edit the --out_csv_name file, and add below header
+### requirements
 ```
-name,x1,y1,x2,y2,x3,y3,x4,y4,pred
+pip install ensemble-boxes
 ```
-
-2. modify --path to path of --out_csv_name and run the cmd (run cmd at root of Scene_text_detection_and_recognition)
+Prepare the yolov7/yolor testing results as below structure:
 ```
-python utils/editResult.py --path deep-text-recognition-benchmark/recog_output/out.csv
+-wbf
+  |- runs         
+  |   |- yolov7_exp   (This folder is same as the exp folder under the yolov7/runs/detect)
+  |   |- yolor_exp    (This folder is same as the exp folder under the yolor/runs/detect)
+   
 ```
-
-You can see the post file at the deep-text-recognition-benchmark/recog_output/out_post.csv
-
-Note: You need to delete the first row of out_post.csv when u want to upload this file to grading system
+Run the following cmd 
+```
+[Current Woring Directory] AI-CUP_Drone/wbf
+python wbf.py
+```
+Create the final csv result.
+```
+[Current Woring Directory] AI-CUP_Drone
+python transform.py
+```
 
 
-
-## U can do the following pre/post-processing (Optional)
-
-## Pre-processing on raw image : CLAHE
-modify --src_path to the folder of original image and modify --dst_path to path of the folder to store result image. 
-run the following cmd (run cmd at root of Scene_text_detection_and_recognition)
-```
-python utils/clahe.py --src_path [your folder] --dst_path [your folder]
-```
-## Post-processing - Non-Maximum Suppression for combining two yolo model pros and cons 
-
-Prepare the data as below structure:
-```
--nms
-  ├ img         (store your original img)
-  ├ label1      (predict result from yolo_model1)
-  ├ label2      (predict result from yolo_model2)
-  └ nms_output  (store the result from nms(model1,model2))
-```
-run the following cmd (run cmd at root of Scene_text_detection_and_recognition)
-```
-python nms/nms.py
-```
-
-## Cite
-
-```
-@inproceedings{baek2019STRcomparisons,
-  title={What Is Wrong With Scene Text Recognition Model Comparisons? Dataset and Model Analysis},
-  author={Baek, Jeonghun and Kim, Geewook and Lee, Junyeop and Park, Sungrae and Han, Dongyoon and Yun, Sangdoo and Oh, Seong Joon and Lee, Hwalsuk},
-  booktitle = {International Conference on Computer Vision (ICCV)},
-  year={2019},
-  pubstate={published},
-  tppubtype={inproceedings}
-}
-```

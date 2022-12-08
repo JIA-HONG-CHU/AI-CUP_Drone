@@ -1,3 +1,0 @@
-#train
-
-python train.py --batch-size 4 --device 0  --img 1920 1920 --data data/aicup.yaml --cfg models/yolor-d6.yaml --weights '/nfs/Workspace/AICup/yolor/runs/train/yolor_d6/11_23/best.pt'  --name yolor_d6 --hyp hyp.finetune.1280.yaml --epochs 100 --cache-image
